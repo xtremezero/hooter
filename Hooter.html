@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hooter 🦉 Local Replica</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-black text-gray-100 font-sans selection:bg-zinc-400 selection:text-black">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- Inline SVG Icons ---
+    const Icon = ({ d, size = 24, className = "" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`fill-none ${className}`} dangerouslySetInnerHTML={{ __html: d }} />
+    );
+    
+    const Home = (p) => <Icon {...p} d='<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' />;
+    const Search = (p) => <Icon {...p} d='<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>' />;
+    const Download = (p) => <Icon {...p} d='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>' />;
+    const Upload = (p) => <Icon {...p} d='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>' />;
+    const ImageIcon = (p) => <Icon {...p} d='<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>' />;
+    const Feather = (p) => <Icon {...p} d='<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" x2="2" y1="8" y2="22"/><line x1="17.5" x2="9" y1="15" y2="15"/>' />;
+    const Trash2 = (p) => <Icon {...p} d='<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>' />;
+    const Heart = (p) => <Icon {...p} d='<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' />;
+    const X = (p) => <Icon {...p} d='<path d="M18 6 6 18"/><path d="m6 6 12 12"/>' />;
+
+    // --- Default Mock Data ---
+    const defaultUser = {
+      id: 'user_1',
+      name: 'Night Owl',
+      handle: '@nightowl',
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
+    };
+
+    const defaultHoots = [
+      {
+        id: 'h_1',
+        author: defaultUser,
+        content: 'Welcome to your LocalHost Hooter replica! Your data is stored securely in your browser. Use the Backup and Restore buttons in the sidebar to save or load your state.',
+        timestamp: new Date().toISOString(),
+        likes: 42,
+        likedByMe: false
+      }
+    ];
+
+    function App() {
+      const [hoots, setHoots] = useState([]);
+      const [currentUser, setCurrentUser] = useState(defaultUser);
+      const [hootInput, setHootInput] = useState('');
+      const [selectedImage, setSelectedImage] = useState(null);
+      const fileInputRef = useRef(null);
+      const imageInputRef = useRef(null);
+
+      useEffect(() => {
+        const storedHoots = localStorage.getItem('local_hooter_hoots');
+        if (storedHoots) {
+          try {
+            setHoots(JSON.parse(storedHoots));
+          } catch (e) {
+            console.error('Failed to parse stored hoots', e);
+            setHoots(defaultHoots);
+          }
+        } else {
+          setHoots(defaultHoots);
+        }
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('local_hooter_hoots', JSON.stringify(hoots));
+      }, [hoots]);
+
+      const handleImageSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => setSelectedImage(event.target.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      };
+
+      const handlePostHoot = (e) => {
+        e.preventDefault();
+        if (!hootInput.trim() && !selectedImage) return;
+
+        const newHoot = {
+          id: `h_${Date.now()}`,
+          author: currentUser,
+          content: hootInput.trim(),
+          image: selectedImage,
+          timestamp: new Date().toISOString(),
+          likes: 0,
+          likedByMe: false
+        };
+
+        setHoots([newHoot, ...hoots]);
+        setHootInput('');
+        setSelectedImage(null);
+      };
+
+      const toggleLike = (hootId) => {
+        setHoots(hoots.map(h => {
+          if (h.id === hootId) {
+            return {
+              ...h,
+              likes: h.likedByMe ? h.likes - 1 : h.likes + 1,
+              likedByMe: !h.likedByMe
+            };
+          }
+          return h;
+        }));
+      };
+
+      const deleteHoot = (hootId) => {
+        setHoots(hoots.filter(h => h.id !== hootId));
+      };
+
+      const handleBackup = () => {
+        const exportData = {
+          version: '1.0',
+          timestamp: new Date().toISOString(),
+          hoots: hoots,
+          user: currentUser
+        };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hooter-local-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      const handleRestoreClick = () => fileInputRef.current?.click();
+
+      const handleRestoreFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (data && data.hoots) {
+              setHoots(data.hoots);
+              if (data.user) setCurrentUser(data.user);
+            }
+          } catch (err) {
+            console.error("Failed to parse backup file.", err);
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      };
+
+      const formatTime = (isoString) => {
+        const date = new Date(isoString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      };
+
+      return (
+        <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-zinc-400 selection:text-black">
+          <div className="max-w-7xl mx-auto flex sm:px-6 lg:px-8">
+            
+            <header className="w-20 lg:w-64 py-4 flex flex-col justify-between sticky top-0 h-screen border-r border-gray-800">
+              <div className="flex flex-col items-center lg:items-start gap-2 lg:gap-4 px-2 lg:px-6">
+                <div className="p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-fit text-zinc-300">
+                  <div className="text-3xl" role="img" aria-label="Owl Logo">🦉</div>
+                </div>
+                <SidebarItem icon={<Home size={28} />} label="Home" active />
+                
+                <button className="hidden lg:flex w-full mt-4 bg-zinc-400 hover:bg-zinc-500 text-black font-bold py-3 px-8 rounded-full justify-center transition-colors shadow-lg">
+                  Hoot
+                </button>
+                <button className="lg:hidden mt-4 bg-zinc-400 hover:bg-zinc-500 text-black p-3 rounded-full transition-colors shadow-lg">
+                  <Feather size={24} />
+                </button>
+              </div>
+
+              <div className="px-2 lg:px-6 flex flex-col gap-2">
+                 <div className="hidden lg:block text-xs text-gray-500 mb-2 uppercase tracking-wide font-semibold">Data Management</div>
+                 <button onClick={handleBackup} className="flex items-center gap-4 p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-full text-left">
+                    <Download size={24} />
+                    <span className="hidden lg:inline text-xl">Backup</span>
+                 </button>
+                 <button onClick={handleRestoreClick} className="flex items-center gap-4 p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-full text-left">
+                    <Upload size={24} />
+                    <span className="hidden lg:inline text-xl">Restore</span>
+                 </button>
+                 <input type="file" accept=".json" ref={fileInputRef} onChange={handleRestoreFile} className="hidden" />
+
+                 <div className="mt-4 flex items-center gap-3 p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-full">
+                    <img src={currentUser.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800" />
+                    <div className="hidden lg:block flex-1 truncate">
+                      <p className="font-bold text-sm leading-tight">{currentUser.name}</p>
+                      <p className="text-gray-500 text-sm leading-tight">{currentUser.handle}</p>
+                    </div>
+                 </div>
+              </div>
+            </header>
+
+            <main className="flex-1 max-w-[600px] border-r border-gray-800 min-h-screen">
+              <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md border-b border-gray-800 p-4">
+                <h1 className="text-xl font-bold">Home</h1>
+              </div>
+
+              <div className="p-4 border-b border-gray-800 flex gap-4">
+                <img src={currentUser.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 flex-shrink-0" />
+                <form onSubmit={handlePostHoot} className="flex-1">
+                  <textarea
+                    className="w-full bg-transparent text-xl placeholder-gray-500 outline-none resize-none border-none focus:ring-0"
+                    placeholder="Who gives a hoot?!"
+                    rows={2}
+                    value={hootInput}
+                    onChange={(e) => setHootInput(e.target.value)}
+                  />
+                  
+                  {selectedImage && (
+                    <div className="relative mt-2 inline-block">
+                      <img src={selectedImage} alt="Preview" className="max-h-64 rounded-2xl border border-gray-800 object-contain" />
+                      <button 
+                        type="button" 
+                        onClick={() => setSelectedImage(null)}
+                        className="absolute top-2 right-2 bg-black/70 hover:bg-black text-white p-1.5 rounded-full transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="border-t border-gray-800 pt-3 flex justify-between items-center mt-2">
+                    <div className="flex gap-2 text-zinc-400">
+                       <button type="button" onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-zinc-400/10 rounded-full cursor-pointer transition-colors">
+                         <ImageIcon size={18} />
+                       </button>
+                       <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImageSelect} className="hidden" />
+                       <div className="p-2 hover:bg-zinc-400/10 rounded-full cursor-pointer transition-colors"><Feather size={18} /></div>
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={!hootInput.trim() && !selectedImage}
+                      className="bg-zinc-400 hover:bg-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-1.5 px-4 rounded-full transition-colors text-sm"
+                    >
+                      Hoot
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="divide-y divide-gray-800 pb-20">
+                {hoots.map(hoot => (
+                  <article key={hoot.id} className="p-4 hover:bg-gray-900/50 transition-colors cursor-pointer flex gap-4">
+                    <img src={hoot.author.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-1 text-sm overflow-hidden">
+                          <span className="font-bold hover:underline truncate">{hoot.author.name}</span>
+                          <span className="text-gray-500 truncate">{hoot.author.handle}</span>
+                          <span className="text-gray-500">·</span>
+                          <span className="text-gray-500 whitespace-nowrap">{formatTime(hoot.timestamp)}</span>
+                        </div>
+                        {hoot.author.id === currentUser.id && (
+                           <button onClick={(e) => { e.stopPropagation(); deleteHoot(hoot.id); }} className="text-gray-500 hover:text-red-500 p-1 rounded-full hover:bg-red-500/10 transition-colors">
+                             <Trash2 size={16} />
+                           </button>
+                        )}
+                      </div>
+                      
+                      <p className="mt-1 text-[15px] whitespace-pre-wrap break-words">{hoot.content}</p>
+                      
+                      {hoot.image && (
+                        <img src={hoot.image} alt="Hoot attachment" className="mt-3 rounded-2xl w-full border border-gray-800 object-cover max-h-[500px]" />
+                      )}
+                      
+                      <div className="flex justify-start mt-3 text-gray-500 max-w-md">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); toggleLike(hoot.id); }}
+                          className={`flex items-center gap-2 group transition-colors ${hoot.likedByMe ? 'text-pink-500' : 'hover:text-pink-500'}`}
+                        >
+                          <div className="p-2 rounded-full group-hover:bg-pink-500/10 transition-colors">
+                             <Heart size={18} className={hoot.likedByMe ? 'fill-current' : ''} />
+                          </div>
+                          <span className="text-xs">{hoot.likes > 0 ? hoot.likes : ''}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+                {hoots.length === 0 && (
+                  <div className="p-8 text-center text-gray-500">
+                    No hoots to display. Start hooting or restore a backup!
+                  </div>
+                )}
+              </div>
+            </main>
+
+            <aside className="hidden lg:block w-[350px] pl-8 py-4">
+              <div className="sticky top-4">
+                <div className="bg-gray-900 rounded-full flex items-center px-4 py-2 mb-6 focus-within:bg-black focus-within:ring-1 focus-within:ring-zinc-400 border border-transparent focus-within:border-zinc-400 transition-all">
+                  <Search size={20} className="text-gray-500" />
+                  <input type="text" placeholder="Search" className="bg-transparent border-none outline-none text-white ml-3 w-full placeholder-gray-500" />
+                </div>
+
+                <div className="bg-gray-900 rounded-2xl p-4 mb-4">
+                  <h2 className="font-bold text-xl mb-4">What's happening</h2>
+                  <TrendItem category="Technology · Trending" topic="#HootJS" posts="12.5K" />
+                  <TrendItem category="Design · Trending" topic="Silver Accents" posts="8,241" />
+                  <TrendItem category="Development · Trending" topic="Nocturnal Coding" posts="5,102" />
+                </div>
+                
+                <div className="text-xs text-gray-500 flex flex-wrap gap-2 px-4">
+                  <a href="#" className="hover:underline">Terms of Service</a>
+                  <a href="#" className="hover:underline">Privacy Policy</a>
+                  <a href="#" className="hover:underline">Cookie Policy</a>
+                  <span>© 2026 Hooter Inc.</span>
+                </div>
+              </div>
+            </aside>
+
+          </div>
+        </div>
+      );
+    }
+
+    function SidebarItem({ icon, label, active }) {
+      return (
+        <div className={`flex items-center gap-4 p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-fit ${active ? 'font-bold' : ''}`}>
+          {icon}
+          <span className="hidden lg:inline text-xl">{label}</span>
+        </div>
+      );
+    }
+
+    function TrendItem({ category, topic, posts }) {
+      return (
+        <div className="mb-4 last:mb-0 cursor-pointer hover:bg-white/5 p-2 -mx-2 rounded-xl transition-colors">
+          <div className="text-xs text-gray-500 flex justify-between">
+            <span>{category}</span>
+            <span className="hover:text-zinc-400">···</span>
+          </div>
+          <div className="font-bold text-[15px] mt-0.5">{topic}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{posts} posts</div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
