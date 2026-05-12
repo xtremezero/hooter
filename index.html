@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,7 +45,7 @@
       {
         id: 'h_1',
         author: defaultUser,
-        content: 'Welcome to Hooter! Your data is stored securely in your browser. Use the Backup and Restore buttons in the sidebar to save or load your state.',
+        content: 'Welcome to Hooter! Your data is stored securely in your browser. Use the Backup and Restore buttons in the sidebar to save or load your state. Click your profile at the bottom left to edit your name and avatar!',
         timestamp: new Date().toISOString(),
         likes: 42,
         likedByMe: false
@@ -58,11 +57,19 @@
       const [currentUser, setCurrentUser] = useState(defaultUser);
       const [hootInput, setHootInput] = useState('');
       const [selectedImage, setSelectedImage] = useState(null);
+      
+      // Profile Editing State
+      const [isEditingProfile, setIsEditingProfile] = useState(false);
+      const [editProfileData, setEditProfileData] = useState(defaultUser);
+
       const fileInputRef = useRef(null);
       const imageInputRef = useRef(null);
+      const avatarInputRef = useRef(null);
 
       useEffect(() => {
         const storedHoots = localStorage.getItem('local_hooter_hoots');
+        const storedUser = localStorage.getItem('local_hooter_user');
+        
         if (storedHoots) {
           try {
             setHoots(JSON.parse(storedHoots));
@@ -73,17 +80,38 @@
         } else {
           setHoots(defaultHoots);
         }
+
+        if (storedUser) {
+          try {
+            setCurrentUser(JSON.parse(storedUser));
+          } catch(e) {
+            console.error('Failed to parse stored user', e);
+          }
+        }
       }, []);
 
       useEffect(() => {
         localStorage.setItem('local_hooter_hoots', JSON.stringify(hoots));
       }, [hoots]);
 
+      useEffect(() => {
+        localStorage.setItem('local_hooter_user', JSON.stringify(currentUser));
+      }, [currentUser]);
+
       const handleImageSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => setSelectedImage(event.target.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      };
+
+      const handleAvatarSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => setEditProfileData({...editProfileData, avatar: event.target.result});
         reader.readAsDataURL(file);
         e.target.value = '';
       };
@@ -164,15 +192,88 @@
         e.target.value = '';
       };
 
+      const handleSaveProfile = (e) => {
+        e.preventDefault();
+        setCurrentUser(editProfileData);
+        // Update existing hoots authored by the current user to reflect the new profile
+        setHoots(hoots.map(h => h.author.id === currentUser.id ? { ...h, author: editProfileData } : h));
+        setIsEditingProfile(false);
+      };
+
       const formatTime = (isoString) => {
         const date = new Date(isoString);
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       };
 
       return (
-        <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-zinc-400 selection:text-black">
+        <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-zinc-400 selection:text-black relative">
+          
+          {/* Profile Edit Modal */}
+          {isEditingProfile && (
+            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold">Edit Profile</h2>
+                  <button onClick={() => setIsEditingProfile(false)} className="text-gray-500 hover:text-white transition-colors bg-gray-800 hover:bg-gray-700 p-2 rounded-full">
+                    <X size={20} />
+                  </button>
+                </div>
+                <form onSubmit={handleSaveProfile} className="flex flex-col gap-5">
+                  <div>
+                    <label className="block text-sm text-gray-400 font-medium mb-1.5">Display Name</label>
+                    <input 
+                      type="text" 
+                      value={editProfileData.name} 
+                      onChange={e => setEditProfileData({...editProfileData, name: e.target.value})} 
+                      className="w-full bg-black border border-gray-700 rounded-xl p-3 text-white outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all" 
+                      required 
+                    />
+                  </div>
+                  
+                  {}
+                  <div>
+                    <label className="block text-sm text-gray-400 font-medium mb-1.5">Avatar</label>
+                    <div className="flex items-center gap-4 p-3 bg-black/50 rounded-xl border border-gray-800">
+                      <div 
+                        className="relative group cursor-pointer rounded-full overflow-hidden flex-shrink-0 w-16 h-16" 
+                        onClick={() => avatarInputRef.current?.click()}
+                        title="Click to upload image"
+                      >
+                        <img 
+                          src={editProfileData.avatar} 
+                          alt="Avatar Preview" 
+                          className="w-full h-full object-cover bg-gray-800 group-hover:opacity-40 transition-opacity" 
+                          onError={(e) => e.target.src = 'https://placehold.co/150x150/111/fff?text=Invalid'} 
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <Upload size={20} className="text-white drop-shadow-md" />
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1">
+                        <input 
+                          type="text" 
+                          value={editProfileData.avatar} 
+                          onChange={e => setEditProfileData({...editProfileData, avatar: e.target.value})} 
+                          className="w-full bg-black border border-gray-700 rounded-xl p-2.5 text-white outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all text-sm" 
+                          placeholder="Or paste image URL..."
+                        />
+                        <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarSelect} className="hidden" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button type="submit" className="mt-2 bg-zinc-200 hover:bg-white text-black font-bold py-3 px-4 rounded-full transition-colors w-full shadow-lg">
+                    Save Changes
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-7xl mx-auto flex sm:px-6 lg:px-8">
             
+            {}
             <header className="w-20 lg:w-64 py-4 flex flex-col justify-between sticky top-0 h-screen border-r border-gray-800">
               <div className="flex flex-col items-center lg:items-start gap-2 lg:gap-4 px-2 lg:px-6">
                 <div className="p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-fit text-zinc-300">
@@ -180,10 +281,10 @@
                 </div>
                 <SidebarItem icon={<Home size={28} />} label="Home" active />
                 
-                <button className="hidden lg:flex w-full mt-4 bg-zinc-400 hover:bg-zinc-500 text-black font-bold py-3 px-8 rounded-full justify-center transition-colors shadow-lg">
+                <button className="hidden lg:flex w-full mt-4 bg-zinc-200 hover:bg-white text-black font-bold py-3 px-8 rounded-full justify-center transition-colors shadow-lg">
                   Hoot
                 </button>
-                <button className="lg:hidden mt-4 bg-zinc-400 hover:bg-zinc-500 text-black p-3 rounded-full transition-colors shadow-lg">
+                <button className="lg:hidden mt-4 bg-zinc-200 hover:bg-white text-black p-3 rounded-full transition-colors shadow-lg">
                   <Feather size={24} />
                 </button>
               </div>
@@ -200,8 +301,12 @@
                  </button>
                  <input type="file" accept=".json" ref={fileInputRef} onChange={handleRestoreFile} className="hidden" />
 
-                 <div className="mt-4 flex items-center gap-3 p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-full">
-                    <img src={currentUser.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800" />
+                 <div 
+                   onClick={() => { setEditProfileData(currentUser); setIsEditingProfile(true); }}
+                   className="mt-4 flex items-center gap-3 p-3 hover:bg-gray-900 rounded-full cursor-pointer transition-colors w-full border border-transparent hover:border-gray-800"
+                   title="Edit Profile"
+                 >
+                    <img src={currentUser.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 object-cover" />
                     <div className="hidden lg:block flex-1 truncate">
                       <p className="font-bold text-sm leading-tight">{currentUser.name}</p>
                       <p className="text-gray-500 text-sm leading-tight">{currentUser.handle}</p>
@@ -210,13 +315,14 @@
               </div>
             </header>
 
+            {}
             <main className="flex-1 max-w-[600px] border-r border-gray-800 min-h-screen">
               <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md border-b border-gray-800 p-4">
                 <h1 className="text-xl font-bold">Home</h1>
               </div>
 
               <div className="p-4 border-b border-gray-800 flex gap-4">
-                <img src={currentUser.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 flex-shrink-0" />
+                <img src={currentUser.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 flex-shrink-0 object-cover" />
                 <form onSubmit={handlePostHoot} className="flex-1">
                   <textarea
                     className="w-full bg-transparent text-xl placeholder-gray-500 outline-none resize-none border-none focus:ring-0"
@@ -241,16 +347,16 @@
 
                   <div className="border-t border-gray-800 pt-3 flex justify-between items-center mt-2">
                     <div className="flex gap-2 text-zinc-400">
-                       <button type="button" onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-zinc-400/10 rounded-full cursor-pointer transition-colors">
+                       <button type="button" onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-zinc-400/10 hover:text-zinc-300 rounded-full cursor-pointer transition-colors">
                          <ImageIcon size={18} />
                        </button>
                        <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImageSelect} className="hidden" />
-                       <div className="p-2 hover:bg-zinc-400/10 rounded-full cursor-pointer transition-colors"><Feather size={18} /></div>
+                       <div className="p-2 hover:bg-zinc-400/10 hover:text-zinc-300 rounded-full cursor-pointer transition-colors"><Feather size={18} /></div>
                     </div>
                     <button 
                       type="submit" 
                       disabled={!hootInput.trim() && !selectedImage}
-                      className="bg-zinc-400 hover:bg-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-1.5 px-4 rounded-full transition-colors text-sm"
+                      className="bg-zinc-200 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-1.5 px-4 rounded-full transition-colors text-sm shadow-sm"
                     >
                       Hoot
                     </button>
@@ -258,10 +364,11 @@
                 </form>
               </div>
 
+              {}
               <div className="divide-y divide-gray-800 pb-20">
                 {hoots.map(hoot => (
                   <article key={hoot.id} className="p-4 hover:bg-gray-900/50 transition-colors cursor-pointer flex gap-4">
-                    <img src={hoot.author.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 flex-shrink-0" />
+                    <img src={hoot.author.avatar} alt="avatar" className="w-10 h-10 rounded-full bg-gray-800 flex-shrink-0 object-cover" />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-1 text-sm overflow-hidden">
@@ -298,13 +405,15 @@
                   </article>
                 ))}
                 {hoots.length === 0 && (
-                  <div className="p-8 text-center text-gray-500">
-                    No hoots to display. Start hooting or restore a backup!
+                  <div className="p-8 text-center text-gray-500 flex flex-col items-center">
+                    <Feather size={48} className="opacity-20 mb-4" />
+                    <p>No hoots to display. Start hooting or restore a backup!</p>
                   </div>
                 )}
               </div>
             </main>
 
+            {}
             <aside className="hidden lg:block w-[350px] pl-8 py-4">
               <div className="sticky top-4">
                 <div className="bg-gray-900 rounded-full flex items-center px-4 py-2 mb-6 focus-within:bg-black focus-within:ring-1 focus-within:ring-zinc-400 border border-transparent focus-within:border-zinc-400 transition-all">
@@ -319,10 +428,11 @@
                   <TrendItem category="Development · Trending" topic="Nocturnal Coding" posts="5,102" />
                 </div>
                 
-                <div className="text-xs text-gray-500 flex flex-wrap gap-2 px-4">
+                <div className="text-xs text-gray-500 flex flex-wrap gap-2 px-4 leading-tight">
                   <a href="#" className="hover:underline">Terms of Service</a>
                   <a href="#" className="hover:underline">Privacy Policy</a>
                   <a href="#" className="hover:underline">Cookie Policy</a>
+                  <a href="#" className="hover:underline">Accessibility</a>
                   <span>© 2026 Hooter Inc.</span>
                 </div>
               </div>
